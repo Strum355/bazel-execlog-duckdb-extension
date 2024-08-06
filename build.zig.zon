@@ -1,0 +1,13 @@
+.{
+    .name = "duckdb-compact-execlog",
+    .version = "0.0.0",
+
+    .dependencies = .{
+        .protobuf = .{
+            .url = "https://github.com/Arwalk/zig-protobuf/archive/a2762e39138ca23b8e380edb535f85578f159d1c.tar.gz",
+            .hash = "1220dfae9a577c2a1a078f570efeace54f32f09c7be04baf472541065c3a07e4218e",
+        },
+    },
+
+    .paths = .{""},
+}
