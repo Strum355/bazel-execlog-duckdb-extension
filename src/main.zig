@@ -4,12 +4,13 @@ const proto = @import("proto/protos.pb.zig");
 const protobuf = @import("protobuf");
 const zstd = @import("std").compress.zstd;
 const c = @cImport(@cInclude("duckdb.h"));
+const Reconstructor = @import("spawnlog_reconstructor.zig").Reconstructor;
 
-const InitData = struct {
-    done: bool,
+const InitData = struct { done: bool, gpa: std.heap.GeneralPurposeAllocator(.{}), file: std.fs.File, reader: Reconstructor(zstd.Decompressor(std.fs.File.Reader)) };
+
+const BindData = struct {
+    path: []u8,
 };
-
-const BindData = struct { gpa: std.heap.GeneralPurposeAllocator(.{}), file: std.fs.File, compressedReader: zstd.Decompressor(std.fs.File.Reader) };
 
 export fn compact_execlog_version_zig() [*:0]const u8 {
     return duckdbext.duckdbVersion();
@@ -95,79 +96,48 @@ fn bind(info: *duckdbext.BindInfo, data: *BindData) !void {
         return;
     };
     defer pathParam.deinit();
-
-    const path: []u8 = std.mem.span(pathParam.toString());
     // defer c.duckdb_free(&path);
 
-    data.gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    data.file = try std.fs.cwd().openFile(path, .{});
-
-    const zstdBuffer = try data.gpa.allocator().create([zstd.DecompressorOptions.default_window_buffer_len]u8);
-    data.compressedReader = zstd.decompressor(data.file.reader(), .{ .window_buffer = zstdBuffer });
+    data.path = std.mem.span(pathParam.toString());
 }
 
-fn init(_: *duckdbext.InitInfo, data: *InitData) !void {
+fn init(info: *duckdbext.InitInfo, data: *InitData) !void {
     data.done = false;
+    const bindData: *BindData = @ptrCast(@alignCast(c.duckdb_init_get_bind_data(info.ptr)));
+
+    data.gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    data.file = try std.fs.cwd().openFile(bindData.path, .{});
+
+    const zstdBuffer = try data.gpa.allocator().create([zstd.DecompressorOptions.default_window_buffer_len]u8);
+
+    data.reader = Reconstructor(zstd.Decompressor(std.fs.File.Reader)).init(zstd.decompressor(data.file.reader(), .{ .window_buffer = zstdBuffer }), data.gpa.allocator());
 }
 
 const maxVarintLen = 10;
 
-fn func(chunk: *duckdbext.DataChunk, initData: *InitData, bindData: *BindData) !void {
+fn func(chunk: *duckdbext.DataChunk, initData: *InitData, _: *BindData) !void {
     if (initData.done) {
         chunk.setSize(0);
-        bindData.file.close();
-        _ = bindData.gpa.deinit();
+        initData.file.close();
+        _ = initData.gpa.deinit();
         return;
+    }
+
+    while (true) {
+        const spawn = try initData.reader.getSpawnExec() orelse break;
+        std.debug.print("GOT EXEC {s} {s}\n", .{ spawn.target_label.getSlice(), spawn.mnemonic.getSlice() });
     }
 
     // TODO: split this out per DataChunk size
 
-    const allocator = bindData.gpa.allocator();
+    initData.done = true;
 
-    const reader = bindData.compressedReader.reader();
-
-    var sizearray = std.mem.zeroes([maxVarintLen]u8);
-
-    outer: while (true) {
-        var j: u8 = 0;
-        for (0..maxVarintLen) |i| {
-            const mb = reader.readByte();
-            if (mb == error.EndOfStream and i != 0) {
-                break;
-            }
-            const b = mb catch |err| switch (err) {
-                error.EndOfStream => break :outer,
-                else => return err,
-            };
-            sizearray[i] = b;
-            j += 1;
-            if (b < 0x80) {
-                break;
-            }
-        }
-
-        const size = try consumeVarint(sizearray[0..j]);
-
-        const buffer = try allocator.alloc(u8, size);
-        defer allocator.free(buffer);
-        try reader.readNoEof(buffer);
-
-        const execlogEntry = try proto.ExecLogEntry.decode(buffer, allocator);
-        switch (execlogEntry.type.?) {
-            .invocation => std.debug.print("got invocation {d} {s}\n", .{ execlogEntry.id, execlogEntry.type.?.invocation.hash_function_name.getSlice() }),
-            else => std.debug.print("execlog entry {d} {any}\n", .{ execlogEntry.id, execlogEntry.type }),
-        }
-        defer execlogEntry.deinit();
-
-        // initData.done = true;
-
-        // const repeated = try repeat(allocator, "🐥", 3);
-        // defer allocator.free(repeated);
-        // for (0..10) |i| {
-        //     chunk.vector(0).assignStringElement(i, "🐥");
-        // }
-        // chunk.setSize(10);
-    }
+    // const repeated = try repeat(allocator, "🐥", 3);
+    // defer allocator.free(repeated);
+    // for (0..10) |i| {
+    //     chunk.vector(0).assignStringElement(i, "🐥");
+    // }
+    // chunk.setSize(10);
 }
 
 pub const VarintError = error{
