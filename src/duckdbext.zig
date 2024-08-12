@@ -92,7 +92,7 @@ pub const LogicalType = enum(c.enum_DUCKDB_TYPE) {
         return @enumFromInt(tpe);
     }
 
-    fn toInternal(self: @This()) Ref {
+    pub fn toInternal(self: @This()) Ref {
         // Creates a duckdb_logical_type from a standard primitive type.
         // todo: The resulting type should be destroyed with duckdb_destroy_logical_type.
         // todo: This should not be used with DUCKDB_TYPE_DECIMAL.

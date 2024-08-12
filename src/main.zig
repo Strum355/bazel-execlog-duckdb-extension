@@ -89,7 +89,115 @@ test compact_execlog_init {
 }
 
 fn bind(info: *duckdbext.BindInfo, data: *BindData) !void {
-    info.addResultColumn("quacks", .varchar);
+    var varchar_list_type = c.duckdb_create_list_type(duckdbext.LogicalType.varchar.toInternal().ptr);
+    defer c.duckdb_destroy_logical_type(&varchar_list_type);
+
+    var envvars_type = c.duckdb_create_struct_type(
+        @constCast(&[_]c.duckdb_logical_type{ duckdbext.LogicalType.varchar.toInternal().ptr, duckdbext.LogicalType.varchar.toInternal().ptr }),
+        @constCast(@alignCast(@ptrCast(&[_][*c]u8{ @constCast("name"), @constCast("value") }))),
+        2,
+    );
+    defer c.duckdb_destroy_logical_type(&envvars_type);
+
+    var platform_property_type = c.duckdb_create_struct_type(
+        @constCast(&[_]c.duckdb_logical_type{ duckdbext.LogicalType.varchar.toInternal().ptr, duckdbext.LogicalType.varchar.toInternal().ptr }),
+        @constCast(@alignCast(@ptrCast(&[_][*c]u8{ @constCast("name"), @constCast("value") }))),
+        2,
+    );
+    defer c.duckdb_destroy_logical_type(&platform_property_type);
+    var platform_properties_type = c.duckdb_create_list_type(platform_property_type);
+    defer c.duckdb_destroy_logical_type(&platform_properties_type);
+    var platform_type = c.duckdb_create_struct_type(
+        @constCast(&[_]c.duckdb_logical_type{platform_properties_type}),
+        @constCast(@alignCast(@ptrCast(&[_][*c]u8{@constCast("properties")}))),
+        1,
+    );
+    defer c.duckdb_destroy_logical_type(&platform_type);
+
+    var digest_type = c.duckdb_create_struct_type(
+        @constCast(&[_]c.duckdb_logical_type{ duckdbext.LogicalType.varchar.toInternal().ptr, duckdbext.LogicalType.int.toInternal().ptr, duckdbext.LogicalType.varchar.toInternal().ptr }),
+        @constCast(@alignCast(@ptrCast(&[_][*c]u8{ @constCast("hash"), @constCast("size_bytes"), @constCast("hash_function_name") }))),
+        3,
+    );
+    defer c.duckdb_destroy_logical_type(&digest_type);
+
+    var file_type = c.duckdb_create_struct_type(
+        @constCast(&[_]c.duckdb_logical_type{ duckdbext.LogicalType.varchar.toInternal().ptr, duckdbext.LogicalType.varchar.toInternal().ptr, digest_type, duckdbext.LogicalType.bool.toInternal().ptr }),
+        @constCast(@alignCast(@ptrCast(&[_][*c]u8{ @constCast("path"), @constCast("symlink_target_path"), @constCast("digest"), @constCast("is_tool") }))),
+        4,
+    );
+    defer c.duckdb_destroy_logical_type(&file_type);
+    var files_type = c.duckdb_create_list_type(file_type);
+    defer c.duckdb_destroy_logical_type(&files_type);
+
+    var metrics_type = c.duckdb_create_struct_type(
+        @constCast(&[_]c.duckdb_logical_type{
+            duckdbext.LogicalType.interval.toInternal().ptr,
+            duckdbext.LogicalType.interval.toInternal().ptr,
+            duckdbext.LogicalType.interval.toInternal().ptr,
+            duckdbext.LogicalType.interval.toInternal().ptr,
+            duckdbext.LogicalType.interval.toInternal().ptr,
+            duckdbext.LogicalType.interval.toInternal().ptr,
+            duckdbext.LogicalType.interval.toInternal().ptr,
+            duckdbext.LogicalType.interval.toInternal().ptr,
+            duckdbext.LogicalType.interval.toInternal().ptr,
+            duckdbext.LogicalType.interval.toInternal().ptr,
+            duckdbext.LogicalType.int.toInternal().ptr,
+            duckdbext.LogicalType.int.toInternal().ptr,
+            duckdbext.LogicalType.int.toInternal().ptr,
+            duckdbext.LogicalType.int.toInternal().ptr,
+            duckdbext.LogicalType.int.toInternal().ptr,
+            duckdbext.LogicalType.int.toInternal().ptr,
+            duckdbext.LogicalType.int.toInternal().ptr,
+            duckdbext.LogicalType.int.toInternal().ptr,
+            duckdbext.LogicalType.interval.toInternal().ptr,
+            duckdbext.LogicalType.timestamp_ns.toInternal().ptr,
+        }),
+        @constCast(@alignCast(@ptrCast(&[_][*c]u8{
+            @constCast("total_time"),
+            @constCast("parse_time"),
+            @constCast("network_time"),
+            @constCast("fetch_time"),
+            @constCast("queue_time"),
+            @constCast("setup_time"),
+            @constCast("upload_time"),
+            @constCast("execution_wall_time"),
+            @constCast("process_outputs_time"),
+            @constCast("retry_time"),
+            @constCast("input_bytes"),
+            @constCast("input_files"),
+            @constCast("memory_estimate_bytes"),
+            @constCast("input_bytes_limit"),
+            @constCast("input_files_limit"),
+            @constCast("output_bytes_limit"),
+            @constCast("output_files_limit"),
+            @constCast("memory_bytes_limit"),
+            @constCast("time_limit"),
+            @constCast("start_time"),
+        }))),
+        20,
+    );
+    defer c.duckdb_destroy_logical_type(&metrics_type);
+
+    // info.addResultColumn("quacks", .varchar);
+    c.duckdb_bind_add_result_column(info.ptr, "command_args", varchar_list_type);
+    c.duckdb_bind_add_result_column(info.ptr, "environment_variables", envvars_type);
+    c.duckdb_bind_add_result_column(info.ptr, "platform", platform_type);
+    c.duckdb_bind_add_result_column(info.ptr, "inputs", files_type);
+    c.duckdb_bind_add_result_column(info.ptr, "lsted_outputs", varchar_list_type);
+    c.duckdb_bind_add_result_column(info.ptr, "remotable", duckdbext.LogicalType.bool.toInternal().ptr);
+    c.duckdb_bind_add_result_column(info.ptr, "cacheable", duckdbext.LogicalType.bool.toInternal().ptr);
+    c.duckdb_bind_add_result_column(info.ptr, "timeout_millis", duckdbext.LogicalType.int.toInternal().ptr);
+    c.duckdb_bind_add_result_column(info.ptr, "mnemonic", duckdbext.LogicalType.varchar.toInternal().ptr);
+    c.duckdb_bind_add_result_column(info.ptr, "actual_outputs", files_type);
+    c.duckdb_bind_add_result_column(info.ptr, "runner", duckdbext.LogicalType.varchar.toInternal().ptr);
+    c.duckdb_bind_add_result_column(info.ptr, "cache_hit", duckdbext.LogicalType.bool.toInternal().ptr);
+    c.duckdb_bind_add_result_column(info.ptr, "status", duckdbext.LogicalType.varchar.toInternal().ptr);
+    c.duckdb_bind_add_result_column(info.ptr, "exit_code", duckdbext.LogicalType.int.toInternal().ptr);
+    c.duckdb_bind_add_result_column(info.ptr, "remote_cacheable", duckdbext.LogicalType.bool.toInternal().ptr);
+    c.duckdb_bind_add_result_column(info.ptr, "target_label", duckdbext.LogicalType.varchar.toInternal().ptr);
+    c.duckdb_bind_add_result_column(info.ptr, "digest", digest_type);
+    c.duckdb_bind_add_result_column(info.ptr, "metrics", metrics_type);
 
     var pathParam: duckdbext.Value = info.getParameter(0) orelse {
         info.setErr("path to execlog required");
@@ -123,66 +231,24 @@ fn func(chunk: *duckdbext.DataChunk, initData: *InitData, _: *BindData) !void {
         return;
     }
 
-    while (true) {
-        const spawn = try initData.reader.getSpawnExec() orelse break;
-        std.debug.print("GOT EXEC {s} {s}\n", .{ spawn.target_label.getSlice(), spawn.mnemonic.getSlice() });
-    }
+    // const vec_size = c.duckdb_vector_size();
 
-    // TODO: split this out per DataChunk size
+    // var idx: u64 = 0;
+    // while (idx < vec_size-1): (idx += 1) {
+    //     const spawn = try initData.reader.getSpawnExec() orelse {
+    //         initData.done = true;
+    //         break;
+    //     };
+    //     std.debug.print("GOT EXEC {s} {s}\n", .{ spawn.target_label.getSlice(), spawn.mnemonic.getSlice() });
+    // }
+    // chunk.setSize(idx);
 
     initData.done = true;
 
     // const repeated = try repeat(allocator, "🐥", 3);
     // defer allocator.free(repeated);
-    // for (0..10) |i| {
-    //     chunk.vector(0).assignStringElement(i, "🐥");
-    // }
-    // chunk.setSize(10);
-}
-
-pub const VarintError = error{
-    CodeTruncated,
-    CodeOverflow,
-};
-
-// proto library has a shorter one, but its not exposed
-pub fn consumeVarint(b: []const u8) VarintError!u64 {
-    var v: u64 = 0;
-    var y: u64 = 0;
-
-    if (b.len == 0) {
-        return VarintError.CodeTruncated;
+    for (0..10) |i| {
+        chunk.vector(0).assignStringElement(i, "🐥");
     }
-
-    v = b[0];
-    if (v < 0x80) {
-        return v;
-    }
-    v -= 0x80;
-
-    inline for (1..9) |i| {
-        if (b.len <= i) {
-            return VarintError.CodeTruncated;
-        }
-
-        y = b[i];
-        v += y << (7 * i);
-
-        if (y < 0x80) {
-            return v;
-        }
-        v -= 0x80 << (7 * i);
-    }
-
-    if (b.len <= 9) {
-        return VarintError.CodeTruncated;
-    }
-
-    y = b[9];
-    v += y << 63;
-    if (y < 2) {
-        return v;
-    }
-
-    return VarintError.CodeOverflow;
+    chunk.setSize(10);
 }
