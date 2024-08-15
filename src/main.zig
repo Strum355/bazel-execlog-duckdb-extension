@@ -4,6 +4,7 @@ const proto = @import("proto/protos.pb.zig");
 const protobuf = @import("protobuf");
 const zstd = @import("std").compress.zstd;
 const c = @cImport(@cInclude("duckdb.h"));
+const bridge = @cImport(@cInclude("bridge.h"));
 const Reconstructor = @import("spawnlog_reconstructor.zig").Reconstructor;
 
 const InitData = struct { done: bool, gpa: std.heap.GeneralPurposeAllocator(.{}), file: std.fs.File, reader: Reconstructor(zstd.Decompressor(std.fs.File.Reader)) };
@@ -24,7 +25,7 @@ test compact_execlog_version_zig {
 }
 
 /// called by c++ bridge when loading ext
-export fn compact_execlog_init_zig(db: *anyopaque) void {
+export fn compact_execlog_init(db: *anyopaque) void {
     std.log.debug("initializing ext...", .{});
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -42,11 +43,11 @@ export fn compact_execlog_init_zig(db: *anyopaque) void {
     };
     defer conn.deinit();
 
-    compact_execlog_init(&conn);
+    compact_execlog_init_zig(&conn);
 }
 
 // split for test injection
-fn compact_execlog_init(conn: *duckdbext.Connection) void {
+fn compact_execlog_init_zig(conn: *duckdbext.Connection) void {
     var table_func = duckdbext.TableFunction(
         InitData,
         BindData,
@@ -66,7 +67,7 @@ fn compact_execlog_init(conn: *duckdbext.Connection) void {
     }
 }
 
-test compact_execlog_init {
+test compact_execlog_init_zig {
     const allocator = std.testing.allocator;
 
     var db = try duckdbext.DB.memory(allocator);
@@ -84,7 +85,7 @@ test compact_execlog_init {
     };
     defer conn.deinit();
 
-    compact_execlog_init(&conn);
+    compact_execlog_init_zig(&conn);
     // todo exec test query
 }
 
@@ -230,6 +231,8 @@ fn func(chunk: *duckdbext.DataChunk, initData: *InitData, _: *BindData) !void {
         _ = initData.gpa.deinit();
         return;
     }
+
+    bridge.duckdb_data_chunk_set_value(@ptrCast(chunk.ptr), 0, 0, null);
 
     // const vec_size = c.duckdb_vector_size();
 

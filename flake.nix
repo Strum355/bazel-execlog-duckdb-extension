@@ -26,7 +26,7 @@
           name = "nixpkgs duckdb dev shell";
 
           DUCKDB_THIRD_PARTY_PATH = "${duckdb-custom}/third_party";
-          DUCKDB_DEV_PATH = "${duckdb-custom.dev}/third_party";
+          DUCKDB_DEV_PATH = "${duckdb-custom.dev}/";
 
           nativeBuildInputs = with pkgs; [
             pkg-config
