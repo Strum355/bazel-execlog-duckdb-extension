@@ -56,27 +56,6 @@ pub fn Reconstructor(comptime ReaderType: type) type {
             var listed_outputs = std.ArrayList(protobuf.ManagedString).init(self.allocator);
             var actual_outputs = std.ArrayList(proto.File).init(self.allocator);
 
-            const s = proto.SpawnExec{
-                .command_args = spawn.args,
-                .environment_variables = spawn.env_vars,
-                .target_label = spawn.target_label,
-                .mnemonic = spawn.mnemonic,
-                .exit_code = spawn.exit_code,
-                .status = spawn.status,
-                .runner = spawn.runner,
-                .cache_hit = spawn.cache_hit,
-                .remotable = spawn.remotable,
-                .cacheable = spawn.cacheable,
-                .remote_cacheable = spawn.remote_cacheable,
-                .timeout_millis = spawn.timeout_millis,
-                .metrics = spawn.metrics,
-                .platform = spawn.platform,
-                .digest = spawn.digest,
-                .inputs = all_inputs,
-                .listed_outputs = listed_outputs,
-                .actual_outputs = actual_outputs,
-            };
-
             for (inputs.order) |path| {
                 var file = inputs.inputs.get(path) orelse return null;
                 if (tools.inputs.contains(path)) {
@@ -110,7 +89,26 @@ pub fn Reconstructor(comptime ReaderType: type) type {
                 }
             }
 
-            return s;
+            return proto.SpawnExec{
+                .command_args = spawn.args,
+                .environment_variables = spawn.env_vars,
+                .target_label = spawn.target_label,
+                .mnemonic = spawn.mnemonic,
+                .exit_code = spawn.exit_code,
+                .status = spawn.status,
+                .runner = spawn.runner,
+                .cache_hit = spawn.cache_hit,
+                .remotable = spawn.remotable,
+                .cacheable = spawn.cacheable,
+                .remote_cacheable = spawn.remote_cacheable,
+                .timeout_millis = spawn.timeout_millis,
+                .metrics = spawn.metrics,
+                .platform = spawn.platform,
+                .digest = spawn.digest,
+                .inputs = all_inputs,
+                .listed_outputs = listed_outputs,
+                .actual_outputs = actual_outputs,
+            };
         }
 
         fn reconstructInputs(self: *@This(), set_id: i32) !struct { order: [][]const u8, inputs: std.StringHashMap(proto.File) } {
@@ -121,7 +119,6 @@ pub fn Reconstructor(comptime ReaderType: type) type {
             var inputs = std.StringHashMap(proto.File).init(self.allocator);
 
             var sets_to_visit = std.AutoArrayHashMap(i32, struct {}).init(arena.allocator());
-            // var sets_to_visit = std.ArrayList(i32).init(arena);
             var visited = std.bit_set.IntegerBitSet(65535).initEmpty();
 
             if (set_id != 0) {

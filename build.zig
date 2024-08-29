@@ -35,11 +35,6 @@ pub fn build(b: *std.Build) !void {
     defer _ = allocator.free(duckdb_re_path);
     lib.addIncludePath(.{ .cwd_relative = duckdb_re_path });
 
-    // our c bridge
-    lib.addIncludePath(b.path("src/include"));
-    // our c++ bridge
-    lib.addCSourceFile(.{ .file = b.path("src/bridge.cpp") });
-
     lib.linkLibC();
     // https://github.com/ziglang/zig/blob/e1ca6946bee3acf9cbdf6e5ea30fa2d55304365d/build.zig#L369-L373
     lib.linkSystemLibrary("c++");
@@ -89,12 +84,6 @@ pub fn build(b: *std.Build) !void {
     // duckdb headers
     main_tests.addIncludePath(b.path("duckdb/src/include"));
     main_tests.addIncludePath(b.path("duckdb/third_party/re2"));
-
-    // our c bridge
-    main_tests.addIncludePath(b.path("src/include"));
-
-    // our c++ bridge
-    main_tests.addCSourceFile(.{ .file = b.path("src/bridge.cpp") });
 
     main_tests.linkLibC();
     // https://github.com/ziglang/zig/blob/e1ca6946bee3acf9cbdf6e5ea30fa2d55304365d/build.zig#L369-L373

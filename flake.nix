@@ -35,7 +35,7 @@
 	          zls
             duckdb-custom
             re2.dev
-          ] ++ pkgs.lib.optionals (pkgs.stdenv.isLinux) [ pkgs.libcxx ];
+          ] ++ pkgs.lib.optionals (pkgs.stdenv.isLinux) [ pkgs.libcxx gdb ];
         };
       });
 }
