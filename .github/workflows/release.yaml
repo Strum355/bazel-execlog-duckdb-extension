@@ -1,0 +1,65 @@
+name: nix_p4-fusion
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  x86_64-darwin:
+    name: Build x86_64-darwin
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Run `nix build`
+        run: nix build .#default
+      - name: Sign the binary
+        # signing in ./result/bin will cause a cache miss on next invocation
+        run: |
+          mkdir -p dist
+          cp -L ./result/lib/compact_execlog* ./dist/
+          sudo codesign --force -s - ./dist/compact_execlog*
+      - name: Show hash of p4-fusion
+        run: shasum -a 256 ./dist/compact_execlog*
+  aarch64-darwin:
+    name: Build aarch64-darwin
+    runs-on: macos-latest-xlarge
+    steps:
+      - uses: actions/checkout@main
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Run `nix build`
+        run: nix build .#default
+      - name: Sign the binary
+        # signing in ./result/bin will cause a cache miss on next invocation
+        run: |
+          mkdir -p dist
+          cp -L ./result/lib/compact_execlog* ./dist/
+          # sudo codesign --force -s - ./dist/compact_execlog*
+      - name: Show hash of p4-fusion
+        run: shasum -a 256 ./dist/compact_execlog*
+  x86_64-linux:
+    name: Build x86_64-linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Run `nix build`
+        run: nix build .#default
+      - name: Show hash of p4-fusion
+        run: shasum -a 256 ./result/lib/compact_execlog*
+  x86_64-linux-gcc4:
+    name: Build x86_64-linux-gcc4
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Run `nix build`
+        run: nix build .#default-gcc4
+      - name: Show hash of p4-fusion
+        run: shasum -a 256 ./result/lib/compact_execlog*        
