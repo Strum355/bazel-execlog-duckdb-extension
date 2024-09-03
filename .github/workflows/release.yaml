@@ -9,7 +9,7 @@ on:
 jobs:
   x86_64-darwin:
     name: Build x86_64-darwin
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@main
       - uses: DeterminateSystems/nix-installer-action@main
@@ -21,12 +21,12 @@ jobs:
         run: |
           mkdir -p dist
           cp -L ./result/lib/compact_execlog* ./dist/
-          sudo codesign --force -s - ./dist/compact_execlog*
+          # sudo codesign --force -s - ./dist/compact_execlog*
       - name: Show hash of p4-fusion
         run: shasum -a 256 ./dist/compact_execlog*
   aarch64-darwin:
     name: Build aarch64-darwin
-    runs-on: macos-latest-xlarge
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@main
       - uses: DeterminateSystems/nix-installer-action@main
