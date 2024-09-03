@@ -26,7 +26,7 @@
       };
 
       devShells = forAllSystems (pkgs: {
-        default = pkgs.mkShell.override { stdenv = pkgs.gcc49Stdenv; } {
+        default = pkgs.mkShell.override { stdenv = if pkgs.hostPlatform.isLinux then pkgs.gcc49Stdenv else pkgs.stdenv; } {
           LIBDUCKDB_PATH = "${self.packages.${pkgs.system}.libduckdb}";
 
           nativeBuildInputs = with pkgs; [
@@ -35,7 +35,7 @@
             zig_0_13
 	          zls
             duckdb
-            gdb
+            #gdb
           ];
         };
       });

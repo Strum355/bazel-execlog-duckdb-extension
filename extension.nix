@@ -6,6 +6,7 @@ stdenv.mkDerivation rec {
   src = ./.;
 
   dontConfigure = true;
+  dontStrip = true;
 
   deps = callPackage ./build.zig.zon.nix { };
 

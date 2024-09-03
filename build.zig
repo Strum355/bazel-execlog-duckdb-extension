@@ -20,6 +20,7 @@ pub fn build(b: *std.Build) !void {
     const libduckdb_path = try std.process.getEnvVarOwned(b.allocator, "LIBDUCKDB_PATH");
 
     lib.linkLibC();
+    lib.linkLibCpp();
     lib.addIncludePath(.{
         .cwd_relative = try std.fmt.allocPrint(b.allocator, "{s}/include", .{libduckdb_path})
     });
