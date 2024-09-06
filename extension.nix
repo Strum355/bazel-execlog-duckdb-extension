@@ -15,6 +15,8 @@ stdenv.mkDerivation rec {
   };
 
   dontConfigure = true;
+  # strips the appended metadata required, 
+  # instead we use Zig's built-in stripping capabilities
   dontStrip = true;
 
   deps = callPackage ./build.zig.zon.nix { };
@@ -31,6 +33,7 @@ stdenv.mkDerivation rec {
   zigBuildFlags = [
     "--system"
     "${deps}"
+    "-Dstrip=true"
   ];
 
   LIBDUCKDB_PATH = "${libduckdb}";

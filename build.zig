@@ -4,6 +4,7 @@ const protobuf = @import("protobuf");
 
 pub fn build(b: *std.Build) !void {
     const gcc_suffix = b.option(bool, "gcc-suffix", "Whether to include _gcc4 suffix in the extension platform. Most Linux DuckDB CLI distributions require it") orelse false;
+    const strip = b.option(bool, "strip", "Strip the binary of debug symbols") orelse false;
 
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -14,6 +15,7 @@ pub fn build(b: *std.Build) !void {
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
+        .strip = strip,
     });
 
     // duckdb headers
