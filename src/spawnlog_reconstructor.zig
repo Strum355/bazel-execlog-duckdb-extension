@@ -119,11 +119,11 @@ pub fn Reconstructor(comptime ReaderType: type) type {
             var inputs = std.StringHashMap(proto.File).init(self.allocator);
 
             var sets_to_visit = std.AutoArrayHashMap(i32, struct {}).init(arena.allocator());
-            var visited = std.bit_set.IntegerBitSet(65535).initEmpty();
+            var visited = std.AutoHashMap(i32, struct {}).init(arena.allocator());
 
             if (set_id != 0) {
                 try sets_to_visit.put(set_id, .{});
-                visited.set(@intCast(set_id));
+                try visited.put(set_id, .{});
             }
 
             while (sets_to_visit.count() > 0) {
@@ -132,8 +132,8 @@ pub fn Reconstructor(comptime ReaderType: type) type {
                 const set = self.sets.get(current_id) orelse unreachable;
 
                 for (set.file_ids.items) |file_id| {
-                    if (!visited.isSet(@intCast(file_id))) {
-                        visited.set(@intCast(file_id));
+                    if (!visited.contains(file_id)) {
+                        try visited.put(file_id, .{});
                         const f = self.files.get(file_id) orelse unreachable;
                         try order.append(f.path.getSlice());
                         try inputs.put(f.path.getSlice(), f);
@@ -141,8 +141,8 @@ pub fn Reconstructor(comptime ReaderType: type) type {
                 }
 
                 for (set.directory_ids.items) |dir_id| {
-                    if (!visited.isSet(@intCast(dir_id))) {
-                        visited.set(@intCast(dir_id));
+                    if (!visited.contains(dir_id)) {
+                        try visited.put(dir_id, .{});
                         const d = self.dirs.get(dir_id) orelse unreachable;
                         for (d.files) |f| {
                             try order.append(f.path.getSlice());
@@ -152,8 +152,8 @@ pub fn Reconstructor(comptime ReaderType: type) type {
                 }
 
                 for (set.unresolved_symlink_ids.items) |sym_id| {
-                    if (!visited.isSet(@intCast(sym_id))) {
-                        visited.set(@intCast(sym_id));
+                    if (!visited.contains(sym_id)) {
+                        try visited.put(sym_id, .{});
                         const s = self.symlinks.get(sym_id) orelse unreachable;
                         try order.append(s.path.getSlice());
                         try inputs.put(s.path.getSlice(), s);
@@ -161,8 +161,8 @@ pub fn Reconstructor(comptime ReaderType: type) type {
                 }
 
                 for (set.transitive_set_ids.items) |sid| {
-                    if (!visited.isSet(@intCast(sid))) {
-                        visited.set(@intCast(sid));
+                    if (!visited.contains(sid)) {
+                        try visited.put(sid, .{});
                         try sets_to_visit.put(sid, .{});
                     }
                 }

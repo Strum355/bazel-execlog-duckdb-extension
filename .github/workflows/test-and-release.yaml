@@ -1,0 +1,85 @@
+name: test and release
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  x86_64-darwin:
+    name: Build x86_64-darwin
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@main
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Run `nix build`
+        run: nix build .#default
+      - name: Show hash
+        run: shasum -a 256 ./result/lib/compact_execlog*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-x86_64-darwin
+          path: result/lib/compact_execlog*        
+  aarch64-darwin:
+    name: Build aarch64-darwin
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@main
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Run `nix build`
+        run: nix build .#default
+      - name: Show hash
+        run: shasum -a 256 ./result/lib/compact_execlog*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-aarch64-darwin
+          path: result/lib/compact_execlog*        
+  x86_64-linux:
+    name: Build x86_64-linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Run `nix build`
+        run: nix build .#default
+      - name: Show hash
+        run: shasum -a 256 ./result/lib/compact_execlog*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-x86_64-linux
+          path: result/lib/compact_execlog*        
+  x86_64-linux-gcc4:
+    name: Build x86_64-linux-gcc4
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Run `nix build`
+        run: nix build .#default-gcc4
+      - name: Show hash
+        run: shasum -a 256 ./result/lib/compact_execlog*        
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-x86_64-linux-gcc4
+          path: result/lib/compact_execlog*
+  publish-artifacts:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    needs: [x86_64-darwin, aarch64-darwin, x86_64-linux, x86_64-linux-gcc4]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: extension
+          pattern: extension-*
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: extension/*
+          draft: false
+          make_latest: true
+          prerelease: false

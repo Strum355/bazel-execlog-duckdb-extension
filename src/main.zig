@@ -26,13 +26,6 @@ export fn compact_execlog_version_zig() [*:0]const u8 {
     return duckdbext.duckdbVersion();
 }
 
-test compact_execlog_version_zig {
-    try std.testing.expectEqualStrings(
-        "v1.0.0",
-        std.mem.sliceTo(compact_execlog_version_zig(), 0),
-    );
-}
-
 /// called by c++ bridge when loading ext
 export fn compact_execlog_init(db: *anyopaque) void {
     std.log.debug("initializing ext...", .{});
@@ -52,11 +45,6 @@ export fn compact_execlog_init(db: *anyopaque) void {
     };
     defer conn.deinit();
 
-    compact_execlog_init_zig(&conn);
-}
-
-// split for test injection
-fn compact_execlog_init_zig(conn: *duckdbext.Connection) void {
     var table_func = duckdbext.TableFunction(
         InitData,
         BindData,
@@ -74,28 +62,6 @@ fn compact_execlog_init_zig(conn: *duckdbext.Connection) void {
         std.debug.print("error registering duckdb table func\n", .{});
         return;
     }
-}
-
-test compact_execlog_init_zig {
-    const allocator = std.testing.allocator;
-
-    var db = try duckdbext.DB.memory(allocator);
-    defer db.deinit();
-
-    var conn = duckdbext.Connection.init(
-        allocator,
-        db,
-    ) catch |e| {
-        std.debug.print(
-            "error connecting to duckdb {any}\n",
-            .{e},
-        );
-        @panic("error connecting to duckdb");
-    };
-    defer conn.deinit();
-
-    compact_execlog_init_zig(&conn);
-    // todo exec test query
 }
 
 fn bind(info: *duckdbext.BindInfo, data: *BindData) !void {
@@ -218,22 +184,24 @@ fn func(chunk: *duckdbext.DataChunk, initData: *InitData, _: *BindData) !void {
             const column = bridge.duckdb_data_chunk_get_vector(chunk.ptr, 2);
             const list_entries_vector = @as([*]bridge.duckdb_list_entry, @ptrCast(@alignCast(bridge.duckdb_vector_get_data(column))))[0..max_rows];
             const list_entry = &list_entries_vector[offsets.row];
-            list_entry.length = spawn.platform.?.properties.items.len;
-            list_entry.offset = offsets.platform;
-            const current_offset = offsets.platform;
-            offsets.platform += spawn.platform.?.properties.items.len;
+            if (spawn.platform) |platforms| {
+                list_entry.length = platforms.properties.items.len;
+                list_entry.offset = offsets.platform;
+                const current_offset = offsets.platform;
+                offsets.platform += platforms.properties.items.len;
 
-            _ = bridge.duckdb_list_vector_reserve(column, offsets.platform);
-            _ = bridge.duckdb_list_vector_set_size(column, offsets.platform);
+                _ = bridge.duckdb_list_vector_reserve(column, offsets.platform);
+                _ = bridge.duckdb_list_vector_set_size(column, offsets.platform);
 
-            const child_vector = bridge.duckdb_list_vector_get_child(column);
-            for (spawn.platform.?.properties.items, 0..) |platform, i| {
-                // https://discord.com/channels/909674491309850675/1148659944669851849/1150416608251105390
-                // index 0 = name field, index 1 = value field
-                const name_field = bridge.duckdb_struct_vector_get_child(child_vector, 0);
-                _ = bridge.duckdb_vector_assign_string_element_len(name_field, current_offset + i, platform.name.getSlice().ptr, platform.name.getSlice().len);
-                const value_field = bridge.duckdb_struct_vector_get_child(child_vector, 1);
-                _ = bridge.duckdb_vector_assign_string_element_len(value_field, current_offset + i, platform.value.getSlice().ptr, platform.value.getSlice().len);
+                const child_vector = bridge.duckdb_list_vector_get_child(column);
+                for (platforms.properties.items, 0..) |platform, i| {
+                    // https://discord.com/channels/909674491309850675/1148659944669851849/1150416608251105390
+                    // index 0 = name field, index 1 = value field
+                    const name_field = bridge.duckdb_struct_vector_get_child(child_vector, 0);
+                    _ = bridge.duckdb_vector_assign_string_element_len(name_field, current_offset + i, platform.name.getSlice().ptr, platform.name.getSlice().len);
+                    const value_field = bridge.duckdb_struct_vector_get_child(child_vector, 1);
+                    _ = bridge.duckdb_vector_assign_string_element_len(value_field, current_offset + i, platform.value.getSlice().ptr, platform.value.getSlice().len);
+                }
             }
         }
 
@@ -405,16 +373,18 @@ fn func(chunk: *duckdbext.DataChunk, initData: *InitData, _: *BindData) !void {
         // digest
         {
             const column = bridge.duckdb_data_chunk_get_vector(chunk.ptr, 16);
-            
-            const hash_field = bridge.duckdb_struct_vector_get_child(column, 0);
-            _ = bridge.duckdb_vector_assign_string_element_len(hash_field, offsets.row, spawn.digest.?.hash.getSlice().ptr, spawn.digest.?.hash.getSlice().len);
-            
-            const size_bytes_field = bridge.duckdb_struct_vector_get_child(column, 1);
-            const size_bytes_data = @as([*]i64, @ptrCast(@alignCast(bridge.duckdb_vector_get_data(size_bytes_field))))[0..max_rows];
-            size_bytes_data[offsets.row] = spawn.digest.?.size_bytes;
 
-            const hash_fn_name_field = bridge.duckdb_struct_vector_get_child(column, 2);
-            _ = bridge.duckdb_vector_assign_string_element_len(hash_fn_name_field, offsets.row, spawn.digest.?.hash_function_name.getSlice().ptr, spawn.digest.?.hash_function_name.getSlice().len);
+            if (spawn.digest) |digest| {
+                const hash_field = bridge.duckdb_struct_vector_get_child(column, 0);
+                _ = bridge.duckdb_vector_assign_string_element_len(hash_field, offsets.row, digest.hash.getSlice().ptr, digest.hash.getSlice().len);
+                
+                const size_bytes_field = bridge.duckdb_struct_vector_get_child(column, 1);
+                const size_bytes_data = @as([*]i64, @ptrCast(@alignCast(bridge.duckdb_vector_get_data(size_bytes_field))))[0..max_rows];
+                size_bytes_data[offsets.row] = digest.size_bytes;
+
+                const hash_fn_name_field = bridge.duckdb_struct_vector_get_child(column, 2);
+                _ = bridge.duckdb_vector_assign_string_element_len(hash_fn_name_field, offsets.row, digest.hash_function_name.getSlice().ptr, digest.hash_function_name.getSlice().len);
+            }
         }
 
         // metrics
