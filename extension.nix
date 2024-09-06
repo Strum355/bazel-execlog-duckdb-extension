@@ -1,9 +1,18 @@
-{ stdenv, callPackage, libduckdb, pkg-config, zig_0_13 }:
+{ lib, stdenv, callPackage, libduckdb, pkg-config, zig_0_13 }:
+let fs = lib.fileset; in 
 stdenv.mkDerivation rec {
   pname = "bazel-execlog-duckdb-extension";
   version = "1.0.0";
 
-  src = ./.;
+  src = fs.toSource {
+    root = ./.;
+    fileset = fs.difference ./. (fs.unions [
+      ./flake.lock
+      ./.envrc
+      (fs.fileFilter (f: f.hasExt "nix") ./.)
+      ./.github
+    ]);
+  };
 
   dontConfigure = true;
   dontStrip = true;

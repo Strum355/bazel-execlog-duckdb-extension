@@ -2,6 +2,7 @@ name: test and release
 
 on:
   push:
+    tags:
     branches:
       - master
   pull_request:
